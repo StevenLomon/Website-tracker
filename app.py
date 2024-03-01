@@ -69,32 +69,35 @@ def main():
     url = st.text_input("Enter the website URL:")
     email = st.text_input("Enter your email address:")
     check_interval = st.number_input("Check interval in seconds:", min_value=30, value=60)
+    start_button = st.button("Start Monitoring")
 
-    if st.button("Start Monitoring"):
-        driver = get_driver()
-        original_content = fetch_site_content(url, driver)
-        if original_content:
-            st.success("Monitoring started. You will receive an email if a change is detected.")
+    if start_button:
+        with st.empty():
+            with st.spinner('Give us a second...'):
+                driver = get_driver()
+                original_content = fetch_site_content(url, driver)
+                if original_content:
+                    st.success("Monitoring started. You will receive an email if a change is detected.")
 
-            # Send to database
-            with app.app_context():
-                web_request = Request()
-                web_request.email = email
-                web_request.url = url
-                db.session.add(web_request)
-                db.session.commit()
-
-            while True:
-                time.sleep(check_interval)
-                new_content = fetch_site_content(url, driver)
-                if compare_content(original_content, new_content):
+                    # Send to database
                     with app.app_context():
-                        # Send mail if there are any changes
-                        send_email(email, "Change detected on website you're tracking! :)", f"A change was detected on {url}")
-                        original_content = new_content  # Update the original content to the new content after change detection
-        else:
-            st.error("Failed to fetch website content. Please check the URL and try again.")
-        driver.quit()
+                        web_request = Request()
+                        web_request.email = email
+                        web_request.url = url
+                        db.session.add(web_request)
+                        db.session.commit()
+
+                    while True:
+                        time.sleep(check_interval)
+                        new_content = fetch_site_content(url, driver)
+                        if compare_content(original_content, new_content):
+                            with app.app_context():
+                                # Send mail if there are any changes
+                                send_email(email, "Change detected on website you're tracking! :)", f"A change was detected on {url}")
+                                original_content = new_content  # Update the original content to the new content after change detection
+                else:
+                    st.error("Failed to fetch website content. Please check the URL and try again.")
+                driver.quit()
 
 if __name__ == "__main__":
     with app.app_context():
