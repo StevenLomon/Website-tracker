@@ -1,15 +1,15 @@
 import streamlit as st
 from flask import Flask, jsonify
 from flask_migrate import Migrate, upgrade
-from db import db, Request
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
+from db import db, Request
+import time
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import time
 
 # Database set-up to track requests
 app = Flask(__name__)
@@ -50,7 +50,7 @@ def send_email(recipient_email, subject, body):
     msg['To'] = recipient_email
     msg['Subject'] = subject
 
-    msg.attach(MIMEText(body, 'plain'))
+    msg.attach(MIMEText(body, 'html'))
 
     try:
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
@@ -68,7 +68,6 @@ def main():
     st.title("Track changes to any website!")
     url = st.text_input("Enter the website URL:")
     email = st.text_input("Enter your email address:")
-    check_interval = st.number_input("Check interval in seconds:", min_value=30, value=60)
     start_button = st.button("Start Monitoring")
 
     if start_button:
@@ -77,7 +76,11 @@ def main():
                 driver = get_driver()
                 original_content = fetch_site_content(url, driver)
                 if original_content:
-                    st.success("Monitoring started. You will receive an email if a change is detected.")
+                    st.success("Monitoring started! Check your e-mail :)")
+
+                    # Send a mail with tracking information
+                    success_email = f"Hi!<br><br>Your monitoring has started! You can now close the tab. We will check {url} every day at 12:00 and you will receive an email if any change is detected. If no changes to the site has been made in 7 days, you will also get a mail that you can reply to if you want to quit the monitoring :)<br><br>Thank you"
+                    send_email(email, "Tracking started! See info in mail", success_email)
 
                     # Send to database
                     with app.app_context():
@@ -86,15 +89,6 @@ def main():
                         web_request.url = url
                         db.session.add(web_request)
                         db.session.commit()
-
-                    while True:
-                        time.sleep(check_interval)
-                        new_content = fetch_site_content(url, driver)
-                        if compare_content(original_content, new_content):
-                            with app.app_context():
-                                # Send mail if there are any changes
-                                send_email(email, "Change detected on website you're tracking! :)", f"A change was detected on {url}")
-                                original_content = new_content  # Update the original content to the new content after change detection
                 else:
                     st.error("Failed to fetch website content. Please check the URL and try again.")
                 driver.quit()
