@@ -1,4 +1,4 @@
-import os
+import base64, json
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -9,7 +9,7 @@ from email.mime.text import MIMEText
 
 def get_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Runs Chrome in headless mode.
+    chrome_options.add_argument("--headless")  # Runs Chrome in headless mode
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     service = Service(executable_path=r"C:\Users\steve\Desktop\Python\chromedriver-win64\chromedriver.exe")
@@ -26,7 +26,7 @@ def send_email(recipient_email, subject, body):
     msg['To'] = recipient_email
     msg['Subject'] = subject
 
-    msg.attach(MIMEText(body, 'plain'))
+    msg.attach(MIMEText(body, 'html'))
 
     try:
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
@@ -40,8 +40,11 @@ def send_email(recipient_email, subject, body):
         print(f"Failed to send email: {e}")
 
 def check_website_changes(event, context):
-    url = event['url']
-    email = event['email']
+    if 'data' in event:
+        message_data = base64.b64decode(event['data']).decode('utf-8')
+        data = json.loads(message_data)
+        url = data['url']
+        email = data['email']
 
     driver = get_driver()
     
