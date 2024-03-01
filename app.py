@@ -40,6 +40,15 @@ def fetch_site_content(url, driver):
 def compare_content(old_content, new_content):
     return old_content != new_content
 
+# Check if the email and URL combination already exists in the database
+def exists_in_database(email, url):
+    existing_request = Request.query.filter_by(email=email, url=url).first()
+    if existing_request is None:
+        return False
+    else:
+        return True
+
+
 # Function to send email
 def send_email(recipient_email, subject, body):
     sender_email = "steven@semurai.se"
@@ -68,30 +77,33 @@ def main():
     st.title("Track changes to any website!")
     url = st.text_input("Enter the website URL:")
     email = st.text_input("Enter your email address:")
-    start_button = st.button("Start Monitoring")
+    start_button = st.button("Start Tracking")
 
     if start_button:
-        with st.empty():
-            with st.spinner('Give us a second...'):
-                driver = get_driver()
-                original_content = fetch_site_content(url, driver)
-                if original_content:
-                    st.success("Monitoring started! Check your e-mail :)")
+        with app.app_context():
+            if not exists_in_database(email, url):
+                with st.spinner('Give us a second...'):
+                    driver = get_driver()
+                    original_content = fetch_site_content(url, driver)
+                    if original_content:
+                        st.success("Monitoring started! Check your e-mail :)")
 
-                    # Send a mail with tracking information
-                    success_email = f"Hi!<br><br>Your monitoring has started! You can now close the tab. We will check {url} every day at 12:00 and you will receive an email if any change is detected. If no changes to the site has been made in 7 days, you will also get a mail that you can reply to if you want to quit the monitoring :)<br><br>Thank you"
-                    send_email(email, "Tracking started! See info in mail", success_email)
+                        # Send a mail with tracking information
+                        success_email = f"Hi!<br><br>Your monitoring has started! You can now close the tab. We will check {url} every day at 12:00 and you will receive an email if any change is detected. If no changes to the site has been made in 7 days, you will also get a mail that you can reply to if you want to quit the monitoring :)<br><br>Thank you"
+                        send_email(email, "Tracking started! See info in mail", success_email)
 
-                    # Send to database
-                    with app.app_context():
+                        # Send to database
                         web_request = Request()
                         web_request.email = email
                         web_request.url = url
                         db.session.add(web_request)
                         db.session.commit()
-                else:
-                    st.error("Failed to fetch website content. Please check the URL and try again.")
-                driver.quit()
+                    else:
+                        st.error("Failed to fetch website content. Please check the URL and try again.")
+                    driver.quit()
+            else:
+                st.warning("Monitoring for that mail and URL combination already exists")
+
 
 if __name__ == "__main__":
     with app.app_context():
@@ -99,3 +111,5 @@ if __name__ == "__main__":
         upgrade()
 
     main()
+
+    
