@@ -1,4 +1,7 @@
 import streamlit as st
+from flask import Flask, jsonify
+from flask_migrate import Migrate, upgrade
+from db import db, Request
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -7,6 +10,15 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import time
+
+# Database set-up to track requests
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = "mysql+mysqlconnector://root:6fGMA/AHC8!A-UH@localhost/website-tracker"
+
+db.app = app
+db.init_app(app)
+migrate = Migrate(app, db)
+
 
 # Function to configure and return a Selenium WebDriver
 def get_driver():
@@ -63,15 +75,30 @@ def main():
         original_content = fetch_site_content(url, driver)
         if original_content:
             st.success("Monitoring started. You will receive an email if a change is detected.")
+
+            # Send to database
+            with app.app_context():
+                web_request = Request()
+                web_request.email = email
+                web_request.url = url
+                db.session.add(web_request)
+                db.session.commit()
+
             while True:
                 time.sleep(check_interval)
                 new_content = fetch_site_content(url, driver)
                 if compare_content(original_content, new_content):
-                    send_email(email, "Change detected on website you're tracking! :)", f"A change was detected on {url}")
-                    original_content = new_content  # Update the original content to the new content after change detection
+                    with app.app_context():
+                        # Send mail if there are any changes
+                        send_email(email, "Change detected on website you're tracking! :)", f"A change was detected on {url}")
+                        original_content = new_content  # Update the original content to the new content after change detection
         else:
             st.error("Failed to fetch website content. Please check the URL and try again.")
         driver.quit()
 
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
+        upgrade()
+
     main()
